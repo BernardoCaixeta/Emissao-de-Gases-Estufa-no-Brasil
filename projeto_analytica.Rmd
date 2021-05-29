@@ -1,0 +1,85 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r Bibliotecas, echo=TRUE, message=FALSE, warning=FALSE}
+library(prophet)
+library(basedosdados)
+library(plotly)
+
+```
+
+```{r Import da Base de Dados, echo=TRUE, message=FALSE, warning=FALSE}
+set_billing_id('projeto-analytics-314021')
+query <- "SELECT * FROM `basedosdados.br_seeg_emissoes.brasil`"
+df <- read_sql(query)
+
+```
+
+```{r echo=TRUE}
+anos <- as.data.frame(df[1])
+nivel_1 <- list()
+
+contador = 1
+for(i in 1:454850){
+    if (!df['nivel_1'][i,] %in% nivel_1) {
+        nivel_1[contador] <- df['nivel_1'][i,]
+        contador <- contador + 1
+    }
+  }
+
+ds <- seq(as.Date("1970/1/1"), as.Date("2019/1/1"), by = "year")
+
+## Agropecuária
+
+emissoes <- as.list(rep(0, 50))
+agropecuaria <- data.frame(ds) 
+
+for(i in 1:454850){
+    if(df['nivel_1'][i,] == 'Agropecuária' && !apply(df['emissao'][i,], 1, is.na)) {
+      indice = match(toString(anos[i,]), format(agropecuaria['ds'][,1], format = "%Y"))
+      emissoes[indice] <- emissoes[indice] + df['emissao'][i,]
+  }
+}
+agropecuaria$y <- emissoes
+
+m <- prophet(agropecuaria, changepoint.prior.scale = 0.1 , daily.seasonality = F, weekly.seasonality = F, interval.width = 0.2, seasonality.mode = "multiplicative")
+future <- make_future_dataframe(m, periods = 5, freq = 'year')
+predicao <- predict(m, future)
+plot(m, predicao, ylab = "Quantidade de Gases Emitidos", xlab = "")
+
+```
+```{r Plotly Agropecuaria, echo=TRUE}
+
+fig <- plot_ly(predicao, x = ~predicao[,1])
+fig <- fig %>% add_trace(type = 'scatter', y = ~predicao[,16], mode = 'lines+markers')
+fig <- fig %>% layout(title = 'Valor estimado para cada ano', xaxis = list(title = 'Ano'),
+                      yaxis = list(title = 'Quantidade de Gases Emitidos'))
+fig
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
